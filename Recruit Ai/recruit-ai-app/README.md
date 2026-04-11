@@ -6,6 +6,19 @@
 
 ---
 
+## 📸 Screenshots
+
+### Dashboard — Job Overview
+![Dashboard showing job cards with evaluation stats](docs/screenshots/dashboard.png)
+
+### Job Detail — AI Evaluation Results
+![Job detail page showing shortlisted candidates with AI scores and candidate stories](docs/screenshots/job-detail.png)
+
+### All Candidates — Cross-Job View
+![All candidates page sorted by AI fit score](docs/screenshots/candidates.png)
+
+---
+
 ## 🎯 User Persona
 
 | Attribute | Detail |
@@ -29,13 +42,15 @@
 
 ## ✨ Features
 
-- **AI Resume Scoring** — GPT-4o-mini evaluates each resume against job requirements, producing a fit score (0–100) with a detailed candidate story
+- **AI Resume Scoring** — GPT-4o-mini / Gemini evaluates each resume against job requirements, producing a fit score (0–100) with a detailed candidate story
 - **Bulk Resume Upload** — Drag & drop multiple PDF/DOCX files; resumes are stored in Supabase cloud storage
-- **Automated Email Outreach** — AI-generated personalized shortlist invitations (with Google Calendar booking links) and rejection emails via Resend
+- **Automated Email Outreach** — AI-generated personalized shortlist invitations (with Google Calendar booking links) and rejection emails via Gmail
 - **Job Management Dashboard** — Create, view, and delete job listings with real-time stats
 - **Candidate Tracking** — View all candidates across all jobs, ranked by fit score
+- **GitHub Profile Analysis** — If a GitHub link is found in the resume, fetches repos and factors code quality into scoring
 - **n8n Automation Pipeline** — Full evaluation pipeline runs through n8n workflows (resume parsing → AI matching → scoring → email outreach)
 - **Real-time Progress** — Live progress bar with stages (Parsing → Matching → Scoring) during AI evaluation
+- **Calendar-Aware Scheduling** — Interview invitations automatically skip weekends and Indian public holidays
 
 ---
 
@@ -45,13 +60,13 @@
 |-------|-----------|---------|
 | **Frontend** | Next.js 16, React 19, Vanilla CSS | SaaS-style dashboard UI |
 | **Backend** | Next.js API Routes (App Router) | REST API for jobs & candidates |
-| **AI Engine** | OpenAI GPT-4o-mini | Resume scoring, email generation |
+| **AI Engine** | Google Gemini 2.0 Flash (via n8n) | Resume scoring, email generation |
 | **Database** | Supabase (PostgreSQL) | Jobs, candidates, and metadata storage |
 | **File Storage** | Supabase Storage | Resume file storage (PDF/DOCX) |
-| **Email** | Resend | Transactional email delivery |
-| **File Parsing** | pdf-parse, mammoth | PDF and DOCX text extraction |
-| **Automation** | n8n (self-hosted) | Resume evaluation pipeline & email workflows |
-| **Tunnel** | ngrok | Expose local n8n webhooks to the internet |
+| **Email** | Gmail (via n8n) | Interview invitations & rejection emails |
+| **File Parsing** | n8n Extract from File node | PDF text extraction |
+| **Automation** | n8n (self-hosted or cloud) | Resume evaluation pipeline & email workflows |
+| **Tunnel** | ngrok (if self-hosted n8n) | Expose local n8n webhooks to the internet |
 
 ---
 
@@ -80,7 +95,11 @@ recruit-ai-app/
 │   ├── email.js                        # Resend email client
 │   ├── supabase.js                     # Supabase client (server-side, service role)
 │   └── mappers.js                      # Data transformation (DB → frontend format)
-├── public/                             # Static assets
+├── docs/
+│   ├── screenshots/                    # UI screenshots for README
+│   └── n8n-workflows/                  # Importable n8n workflow JSON files
+│       ├── candidate-evaluation-pipeline.json
+│       └── interview-reschedule-handler.json
 ├── .env.local                          # Environment variables (NOT committed)
 ├── .gitignore                          # Excludes node_modules, .next, .env*, etc.
 ├── package.json                        # Dependencies and scripts
@@ -105,8 +124,8 @@ recruit-ai-app/
 | Service | Sign Up | What You Need |
 |---------|---------|---------------|
 | **Supabase** | [supabase.com](https://supabase.com) | Project URL + Service Role Key |
-| **OpenAI** | [platform.openai.com](https://platform.openai.com) | API Key |
-| **Resend** | [resend.com](https://resend.com) | API Key + Verified sender domain |
+| **Google Gemini** | [aistudio.google.com](https://aistudio.google.com) | API Key (for n8n AI nodes) |
+| **Gmail** | Google account | OAuth2 credentials (for n8n email nodes) |
 
 ---
 
@@ -181,31 +200,94 @@ CREATE TABLE public.candidates (
 1. Go to **Settings → API** in the Supabase dashboard
 2. Copy:
    - **Project URL** (e.g., `https://your-project-id.supabase.co`)
-   - **Service Role Key** (under "service_role" — this is a secret, never expose it publicly)
+   - **Service Role Key** (under "service_role" — this is a secret, never expose publicly)
    - **Anon/Publishable Key** (under "anon public")
 
-### Step 4: Set Up n8n (Automation Engine)
+---
 
-The AI evaluation pipeline runs through n8n:
+### Step 4: Set Up n8n Backend (AI Evaluation Pipeline)
 
-1. **Install n8n** locally or use [n8n Cloud](https://n8n.io)
+The brain of Recruit AI runs on **n8n**. The workflow JSON files are included in this repo at `docs/n8n-workflows/`. Choose one of the options below:
+
+---
+
+#### Option A: n8n with Docker (Self-Hosted — Recommended)
+
+1. **Start n8n with Docker:**
    ```bash
-   npm install -g n8n
-   n8n start
+   docker run -d \
+     --name n8n \
+     -p 5678:5678 \
+     -v n8n_data:/home/node/.n8n \
+     -e GENERIC_TIMEZONE="Asia/Kolkata" \
+     n8nio/n8n
    ```
 
-2. **Expose n8n with ngrok** (if running locally):
+2. **Access n8n** at `http://localhost:5678` and create your admin account
+
+3. **Import the workflows:**
+   - Go to **Workflows → Import from File**
+   - Import `docs/n8n-workflows/candidate-evaluation-pipeline.json`
+   - Import `docs/n8n-workflows/interview-reschedule-handler.json`
+
+4. **Configure credentials in n8n:**
+
+   | Credential | Where to Add | Instructions |
+   |-----------|-------------|-------------|
+   | **Google Gemini API** | Settings → Credentials → New → Google PaLM (Gemini) | Paste your API key from [aistudio.google.com](https://aistudio.google.com/apikey) |
+   | **Gmail OAuth2** | Settings → Credentials → New → Gmail OAuth2 | Follow [Gmail OAuth2 setup guide](https://docs.n8n.io/integrations/builtin/credentials/google/) |
+
+5. **Update Supabase URLs in the workflow:**
+   - Open the **"Request to Job table"** node → Replace `YOUR_SUPABASE_PROJECT_ID` with your actual Supabase project ID
+   - Replace `YOUR_SUPABASE_ANON_KEY` with your actual anon key
+   - Do the same for **"Saving to Supabase"** node
+
+6. **Expose n8n with ngrok** (so your Next.js app can reach it):
    ```bash
    ngrok http 5678
    ```
    Copy the HTTPS URL (e.g., `https://xxxx.ngrok-free.dev`)
 
-3. **Import the evaluation workflow** into n8n:
-   - The workflow accepts a webhook with `{ job_id, candidate_id, resume_url }`
-   - It downloads the resume, extracts text, calls OpenAI for scoring, and updates the candidate in Supabase
-   - Connect your OpenAI and Supabase credentials in n8n
+7. **Copy the webhook URL:**
+   - Open the **Candidate Evaluation Pipeline** workflow
+   - Click the **Webhook** trigger node
+   - Copy the **Production URL** (it will look like `https://xxxx.ngrok-free.dev/webhook/candidate-evaluation`)
+   - Add this to your `.env.local` as `N8N_WEBHOOK_URL`
 
-4. **Copy the webhook URL** from your n8n Webhook trigger node
+8. **Activate the workflow** (toggle on in n8n)
+
+---
+
+#### Option B: n8n Cloud (No Docker Required)
+
+1. **Sign up** at [n8n.io/cloud](https://n8n.io/cloud) (free trial available)
+
+2. **Import the workflows:**
+   - Go to **Workflows → Import from File**
+   - Import `docs/n8n-workflows/candidate-evaluation-pipeline.json`
+   - Import `docs/n8n-workflows/interview-reschedule-handler.json`
+
+3. **Configure credentials** (same as Docker — Gemini API + Gmail OAuth2)
+
+4. **Update Supabase URLs** in both HTTP Request nodes (same as step 5 above)
+
+5. **Copy the webhook URL:**
+   - n8n Cloud provides a public URL automatically (no ngrok needed)
+   - Click the **Webhook** trigger node → Copy the **Production URL**
+   - Add it to `.env.local` as `N8N_WEBHOOK_URL`
+
+6. **Activate the workflow**
+
+---
+
+#### Option C: n8n Desktop App (Simplest)
+
+1. **Download** from [n8n.io/get-started](https://n8n.io/get-started)
+2. **Import workflows** from `docs/n8n-workflows/`
+3. **Configure credentials** and **update Supabase URLs**
+4. **Use ngrok** to expose the webhook (same as Docker option step 6–7)
+
+---
 
 ### Step 5: Configure Environment Variables
 
@@ -217,13 +299,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 SUPABASE_ANON_KEY=your-anon-key-here
 
-# ─── OpenAI ────────────────────────────────────────────────
-OPENAI_API_KEY=your-openai-api-key-here
-
 # ─── n8n Webhook ───────────────────────────────────────────
-N8N_WEBHOOK_URL=https://your-ngrok-url.ngrok-free.dev/webhook/your-webhook-id
+N8N_WEBHOOK_URL=https://your-n8n-url/webhook/candidate-evaluation
 
-# ─── Email (Resend) ────────────────────────────────────────
+# ─── Email (Resend) — Optional if using Gmail via n8n ──────
 RESEND_API_KEY=your-resend-api-key-here
 FROM_EMAIL=you@yourdomain.com
 FROM_NAME=Recruit AI
@@ -252,19 +331,51 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 │  2. UPLOAD RESUMES                                               │
 │     Drag & drop PDF/DOCX → Stored in Supabase Storage            │
 ├─────────────────────────────────────────────────────────────────┤
-│  3. START AI EVALUATION                                          │
-│     App triggers n8n webhook for each pending candidate          │
-│     n8n pipeline: Parse resume → Match against JD → Score (0–100)│
+│  3. START AI EVALUATION (triggers n8n webhook)                   │
+│     For each candidate:                                          │
+│     → Download resume from Supabase Storage                      │
+│     → Extract text from PDF                                      │
+│     → AI Agent 1: Extract name, email, skills, GitHub            │
+│     → Fetch GitHub repos (if available)                          │
+│     → AI Agent 2: Score candidate (0–100) + write candidate story│
+│     → Save results to Supabase                                   │
+│     → Route: Score ≥ 60 → Shortlisted / Score < 60 → Rejected   │
+│     → AI-generate personalized email                             │
+│     → Send via Gmail                                             │
 ├─────────────────────────────────────────────────────────────────┤
-│  4. VIEW RESULTS                                                 │
-│     Candidates ranked by fit score                               │
-│     Score ≥ 60 → ✅ Shortlisted                                  │
-│     Score < 60 → ❌ Rejected                                     │
+│  4. VIEW RESULTS (real-time polling)                             │
+│     Candidates ranked by fit score with AI candidate stories     │
 ├─────────────────────────────────────────────────────────────────┤
-│  5. AUTOMATED EMAILS                                             │
-│     Shortlisted → Personalized invite + calendar link            │
-│     Rejected → Compassionate AI-generated rejection              │
+│  5. RESCHEDULE HANDLER (separate workflow)                       │
+│     Monitors Gmail for candidate replies → Proposes new date     │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 n8n Workflow Architecture
+
+### Workflow 1: Candidate Evaluation Pipeline (26 nodes)
+
+```
+Webhook → Respond → Edit Fields → Fetch Job → Download Resume → Extract PDF
+   ↓
+Extraction Agent (Gemini) → Check GitHub? → [Yes] → Fetch GitHub Repos → Merge
+                           → [No]  → Merge ──────────────────────────┘
+   ↓
+Intelligence Agent (Gemini) → Save to Supabase → Check Score ≥ 60?
+   ↓                                               ↓           ↓
+[Shortlisted]                              [Rejected]
+   ↓                                               ↓
+Check Calendar → Interview Email Agent      Rejection Email Agent
+   ↓                      ↓                        ↓
+Send Interview Email (Gmail)                Send Rejection Email (Gmail)
+```
+
+### Workflow 2: Interview Reschedule Handler (6 nodes)
+
+```
+Gmail Trigger → Parse Reply → Check New Date → Reschedule Agent → Send Email
 ```
 
 ---
@@ -312,6 +423,8 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 | `career_level_score` | NUMERIC | — | Career level fit |
 | `seniority_fit_score` | NUMERIC | — | Seniority match |
 | `skills` | JSONB | — | Extracted skills array |
+| `github_url` | TEXT | — | GitHub profile URL |
+| `github_score` | NUMERIC | — | GitHub activity/quality score |
 | `status` | TEXT | `'analyzed'` | `pending` / `analyzed` |
 | `created_at` | TIMESTAMP | `now()` | Creation timestamp |
 
@@ -320,22 +433,10 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 ## 🔐 Security Notes
 
 - `.env.local` is in `.gitignore` — secrets are **never committed**
+- n8n workflow JSON files are **sanitized** — all API keys, credentials, and personal data removed
 - The app uses Supabase **Service Role Key** (server-side only, never exposed to the browser)
-- Email sending uses server-side API routes only
+- Email sending uses server-side API routes and n8n workflows only
 - No authentication in MVP — designed for single-admin use
-
----
-
-## 🤝 n8n Workflow Integration
-
-The n8n automation pipeline handles the heavy lifting:
-
-| Workflow | Trigger | What It Does |
-|----------|---------|-------------|
-| **Resume Evaluation** | Webhook (POST from app) | Downloads resume → Extracts text → Calls OpenAI for scoring → Updates candidate in Supabase → Sends email |
-| **Interview Scheduling** | Post-evaluation | Sends calendar invitations to shortlisted candidates, checks HR availability |
-| **Rejection Emails** | Post-evaluation | Sends AI-generated compassionate rejection emails |
-| **Reschedule Handler** | Candidate reply | Processes rescheduling requests and re-checks calendar availability |
 
 ---
 
@@ -344,11 +445,12 @@ The n8n automation pipeline handles the heavy lifting:
 | In Scope | Out of Scope |
 |----------|-------------|
 | Single admin user | Multi-user / team accounts |
-| AI resume scoring | Analytics dashboard |
+| AI resume scoring (Gemini) | Analytics dashboard |
 | Bulk upload (PDF/DOCX) | ATS integration |
-| Automated emails | Reply/inbox listening |
+| Automated emails (Gmail) | Reply/inbox listening (basic handler included) |
 | Google Calendar link | Calendar bot / auto-scheduling |
 | n8n automation | Custom ML model training |
+| GitHub profile analysis | LinkedIn data scraping |
 
 ---
 

@@ -1,0 +1,380 @@
+{
+  "name": "Candidate Evaluation Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "candidate-evaluation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-112, -16],
+      "id": "fee94cf9-83bf-481b-84e4-1e3f9ef1d7d8",
+      "name": "Webhook",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"processing\",\"message\":\"Candidate evaluation started\"}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [96, 48]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "f1", "name": "job_id", "type": "string", "value": "={{ $json.body.job_id }}" },
+            { "id": "f2", "name": "candidate_id", "type": "string", "value": "={{ $json.body.candidate_id }}" },
+            { "id": "f3", "name": "resume_url", "type": "string", "value": "={{ $json.body.resume_url }}" }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [320, -112]
+    },
+    {
+      "parameters": {
+        "url": "=https://YOUR_SUPABASE_PROJECT_ID.supabase.co/rest/v1/jobs?id=eq.{{ $json.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "YOUR_SUPABASE_ANON_KEY" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [480, 32],
+      "id": "48e809c4-8a5d-4490-8769-02ae10b2ef6b",
+      "name": "Request to Job table"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Edit Fields').item.json.resume_url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [656, 0],
+      "id": "907bddd1-8a29-4dc6-b020-950604638dd7",
+      "name": "Download Resume"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [864, 0],
+      "id": "d5a67803-218a-4c9c-8d66-6b925226a1f3",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a precise resume data extractor.\n\nCRITICAL RULES:\n• Extract ONLY facts explicitly stated in the resume text below.\n• DO NOT guess, infer, or estimate ANY value.\n• DO NOT evaluate or score the candidate.\n• If a field is not found in the resume, return null.\n• years_of_experience: ONLY set this if the resume explicitly states years of experience. Otherwise return 0.\n\nURL RULES:\n• GitHub: If a GitHub username or link is found, return the full URL (e.g., \"https://github.com/username\"). If not found, return null.\n• Portfolio: If a portfolio URL is found, include https://. If not found, return null.\n• NEVER return \"N/A\", \"None\", \"-\", or empty strings for URLs. Use null.\n\nFIELDS TO EXTRACT:\n- name\n- email\n- phone\n- skills (array of strings)\n- github (full URL or null)\n- current_title (exact title from resume or null)\n- seniority_level (Junior/Mid/Senior — based on title only, not guessed)\n- years_of_experience (number — ONLY if explicitly stated, else 0)\n\nReturn ONLY valid JSON. No markdown. No explanation.\n\n{\n\"name\": \"\",\n\"email\": \"\",\n\"phone\": \"\",\n\"skills\": [],\n\"github\": null,\n\"current_title\": \"\",\n\"seniority_level\": \"\",\n\"years_of_experience\": 0\n}\n\nRESUME:\n{{ $json.text }}\n",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [1136, -416],
+      "id": "9fc363ff-6bf4-44f7-be0b-09c4ddef4792",
+      "name": "Candidate Extraction Agent"
+    },
+    {
+      "parameters": {
+        "options": { "temperature": 0.2 }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [1120, -128],
+      "id": "d7e0e010-591e-41bc-aea4-3f14cdf16785",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\"name\":\"string\",\n\"email\":\"string\",\n\"phone\":\"string\",\n\"skills\":[\"string\"],\n\"github\":\"string\",\n\"current_title\":\"string\",\n\"seniority_level\":\"string\",\n\"years_of_experience\":\"number\"\n}\n",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [1264, -80],
+      "id": "1521e4c8-8293-4f1c-893f-350309f8b1c1",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "173e30d9-1471-400d-b837-6a8e554ba811",
+              "leftValue": "={{ $json.output.github }}",
+              "operator": { "operation": "isNotEmpty", "singleValue": true, "type": "string" },
+              "rightValue": ""
+            }
+          ],
+          "options": { "version": 3, "leftValue": "", "caseSensitive": true, "typeValidation": "loose" }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1536, -512],
+      "id": "084d3c85-9f56-404e-ac15-f49ce0388744",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/users/{{ $json.output.github.split('/').pop() }}/repos?sort=updated&per_page=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "User-Agent", "value": "n8n-recruit-ai" },
+            { "name": "Accept", "value": "application/vnd.github.v3+json" }
+          ]
+        },
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1776, -528],
+      "id": "8f1853ba-f84b-48e4-ad66-f229777efd07",
+      "name": "GitHub HTTP Request Node"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": { "includeUnpaired": true }
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [1872, 112],
+      "id": "feaa2a05-2cb4-48b2-9945-19da84da744a",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a strict, evidence-based recruiter evaluating a candidate.\n\nCRITICAL GROUNDING RULES:\n1. ONLY use information explicitly present in the RESUME text and CANDIDATE DATA below.\n2. NEVER fabricate, assume, or infer ANY information not in the provided data.\n3. If the resume does not mention years of experience, do NOT claim any.\n4. If GitHub data is empty or unavailable, set github_score to 0.\n5. candidate_story MUST only reference facts from the resume. No invented details.\n6. All scores MUST be integers from 0 to 100.\n\nSCORING GUIDE (0-100 scale):\n• title_authenticity_score: Is the candidate's title credible given their experience?\n• career_level_score: Career progression quality based on resume evidence\n• seniority_fit_score: Does their seniority match the job requirements?\n• github_score: Quality/activity of GitHub repos if available. 0 if no GitHub data.\n• validation_score: Overall trustworthiness of the candidate profile\n• fit_score: Overall fit for this specific job based on skills, experience, and job requirements\n\nJOB DESCRIPTION:\n{{ $('Request to Job table').item.json.job_description }}\n\nSTAKEHOLDER EXPECTATIONS:\n{{ $('Request to Job table').item.json.stakeholder_expectations }}\n\nRESUME TEXT:\n{{ $('Extract from File').item.json.text }}\n\nCANDIDATE DATA (extracted):\n{{ JSON.stringify($json.output || $json) }}\n\nGITHUB REPOS (if available):\n{{ $json.github_repos ? JSON.stringify($json.github_repos) : 'No GitHub data available' }}\n\nReturn ONLY valid JSON. No markdown. No explanation.\nAll number fields MUST be integers (not strings).\n\n{\n\"name\": \"\",\n\"email\": \"\",\n\"phone\": \"\",\n\"skills\": [],\n\"github\": null,\n\"github_score\": 0,\n\"title_authenticity_score\": 0,\n\"career_level_score\": 0,\n\"seniority_fit_score\": 0,\n\"validation_score\": 0,\n\"fit_score\": 0,\n\"candidate_story\": \"\"\n}\n",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [1648, 384],
+      "id": "c43c57ab-50c9-4aec-a34a-0a6ff6618124",
+      "name": "Candidate Intelligence Agent"
+    },
+    {
+      "parameters": { "options": { "temperature": 0.3 } },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [1440, 576],
+      "id": "392f9701-b444-49d8-87b6-a9ae96394069",
+      "name": "Google Gemini Chat Model3",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\"name\":\"string\",\n\"email\":\"string\",\n\"phone\":\"string\",\n\"skills\":[\"string\"],\n\"github\":\"string\",\n\"github_score\":\"number\",\n\"title_authenticity_score\":\"number\",\n\"career_level_score\":\"number\",\n\"seniority_fit_score\":\"number\",\n\"validation_score\":\"number\",\n\"fit_score\":\"number\",\n\"candidate_story\":\"string\"\n}\n",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [1648, 704],
+      "id": "af95a4bb-0c5f-4c94-b47f-8acca3915eaa",
+      "name": "Structured Output Parser2"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://YOUR_SUPABASE_PROJECT_ID.supabase.co/rest/v1/candidates?id=eq.{{ $('Edit Fields').item.json.candidate_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "YOUR_SUPABASE_ANON_KEY" },
+            { "name": "Authorization", "value": "Bearer YOUR_SUPABASE_ANON_KEY" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $json.output.name || '', email: $json.output.email || '', phone: $json.output.phone || '', github_url: $json.output.github || null, github_score: Number($json.output.github_score) || 0, skills: $json.output.skills || [], title_authenticity_score: Number($json.output.title_authenticity_score) || 0, career_level_score: Number($json.output.career_level_score) || 0, seniority_fit_score: Number($json.output.seniority_fit_score) || 0, validation_score: Number($json.output.validation_score) || 0, fit_score: Number($json.output.fit_score) || 0, candidate_story: String($json.output.candidate_story || ''), status: 'analyzed' }) }}",
+        "options": { "response": { "response": { "responseFormat": "json" } } }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2064, 480],
+      "id": "0051981e-bbe9-47f3-8175-799da8963d5c",
+      "name": "Saving to Supabase",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": { "options": {} },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [1200, 128],
+      "id": "9ddd9039-8113-4c28-9bb2-1148cc9b48e9",
+      "name": "Google Gemini Chat Model4",
+      "credentials": {}
+    },
+    {
+      "parameters": { "options": {} },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [1504, 784],
+      "id": "84d972ad-a324-4c3c-8a03-f6551c92935f",
+      "name": "Google Gemini Chat Model5",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "shortlisted-check-1",
+              "leftValue": "={{ $json.output.fit_score }}",
+              "operator": { "operation": "gte", "type": "number" },
+              "rightValue": "={{ 60 }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1000001-0001-4000-8000-000000000001",
+      "name": "If Shortlisted",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2320, 480]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compute next available business day, skipping weekends & Indian public holidays\nconst items = $input.all();\n\nconst holidays2026 = [\n  '2026-01-26','2026-03-10','2026-04-03','2026-04-14',\n  '2026-05-01','2026-08-15','2026-08-19','2026-09-25',\n  '2026-10-02','2026-10-12','2026-11-02','2026-11-03',\n  '2026-11-19','2026-12-25'\n];\n\nfunction isBusinessDay(dt) {\n  if (dt.weekday === 6 || dt.weekday === 7) return false;\n  return !holidays2026.includes(dt.toFormat('yyyy-MM-dd'));\n}\n\nconst now = DateTime.now().setZone('Asia/Kolkata');\nlet candidate = now.plus({ days: 1 });\nlet attempts = 0;\nwhile (!isBusinessDay(candidate) && attempts < 10) {\n  candidate = candidate.plus({ days: 1 });\n  attempts++;\n}\n\nreturn items.map(item => ({\n  json: {\n    ...item.json,\n    proposed_interview_date: candidate.toFormat('yyyy-MM-dd'),\n    proposed_interview_time: '10:00 AM IST',\n    proposed_interview_day: candidate.toFormat('EEEE, MMMM dd, yyyy'),\n  }\n}));"
+      },
+      "id": "b1000001-0002-4000-8000-000000000002",
+      "name": "Check Calendar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2560, 320]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a professional HR assistant composing an interview invitation email.\n\nCANDIDATE:\n- Name: {{ $json.output.name }}\n- Email: {{ $json.output.email }}\n\nPROPOSED INTERVIEW:\n- Date: {{ $json.proposed_interview_day }}\n- Time: {{ $json.proposed_interview_time }}\n\nWRITE a professional, warm HTML email with:\n1. A clear subject line like \"Interview Invitation\"\n2. Congratulate them on being shortlisted\n3. Propose the interview date and time\n4. Ask them to confirm or suggest an alternative date\n5. Sign off as the Recruitment Team\n\nRETURN ONLY valid JSON with these fields:\n{\"subject\": \"...\", \"body\": \"<html>...</html>\"}\n\nNo markdown fences. No extra text. ONLY the JSON object.",
+        "options": {}
+      },
+      "id": "b1000001-0003-4000-8000-000000000003",
+      "name": "Interview Email Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [2800, 240]
+    },
+    {
+      "parameters": { "modelName": "models/gemini-2.0-flash", "options": {} },
+      "id": "b1000001-0004-4000-8000-000000000004",
+      "name": "Gemini for Interview Email",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [2704, 464],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.output.email }}",
+        "subject": "={{ $json.output.subject }}",
+        "message": "={{ $json.output.body }}",
+        "options": { "senderName": "Recruitment Team" }
+      },
+      "id": "b1000001-0005-4000-8000-000000000005",
+      "name": "Send Interview Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [3088, 240],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a professional HR assistant composing a polite rejection email.\n\nCANDIDATE:\n- Name: {{ $json.output.name }}\n- Email: {{ $json.output.email }}\n\nWRITE a professional, empathetic HTML rejection email with:\n1. Subject line like \"Application Update\"\n2. Thank them for their time and interest\n3. Inform them the team moved forward with other candidates\n4. Encourage them to apply for future openings\n5. Sign off as the Recruitment Team\n\nDo NOT mention scores or reasons.\n\nRETURN ONLY valid JSON:\n{\"subject\": \"...\", \"body\": \"<html>...</html>\"}\n\nNo markdown fences. ONLY the JSON object.",
+        "options": {}
+      },
+      "id": "b1000001-0006-4000-8000-000000000006",
+      "name": "Rejection Email Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [2560, 720]
+    },
+    {
+      "parameters": { "modelName": "models/gemini-2.0-flash", "options": {} },
+      "id": "b1000001-0007-4000-8000-000000000007",
+      "name": "Gemini for Rejection Email",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [2464, 928],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.output.email }}",
+        "subject": "={{ $json.output.subject }}",
+        "message": "={{ $json.output.body }}",
+        "options": { "senderName": "Recruitment Team" }
+      },
+      "id": "b1000001-0008-4000-8000-000000000008",
+      "name": "Send Rejection Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [2848, 720],
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] },
+    "Respond to Webhook": { "main": [[{ "node": "Edit Fields", "type": "main", "index": 0 }]] },
+    "Edit Fields": { "main": [[{ "node": "Request to Job table", "type": "main", "index": 0 }]] },
+    "Request to Job table": { "main": [[{ "node": "Download Resume", "type": "main", "index": 0 }]] },
+    "Download Resume": { "main": [[{ "node": "Extract from File", "type": "main", "index": 0 }]] },
+    "Extract from File": { "main": [[{ "node": "Candidate Extraction Agent", "type": "main", "index": 0 }]] },
+    "Google Gemini Chat Model2": { "ai_languageModel": [[{ "node": "Candidate Extraction Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "Structured Output Parser1": { "ai_outputParser": [[{ "node": "Candidate Extraction Agent", "type": "ai_outputParser", "index": 0 }]] },
+    "Candidate Extraction Agent": { "main": [[{ "node": "Merge", "type": "main", "index": 1 }, { "node": "If", "type": "main", "index": 0 }]] },
+    "If": { "main": [[{ "node": "GitHub HTTP Request Node", "type": "main", "index": 0 }], [{ "node": "Merge", "type": "main", "index": 0 }]] },
+    "GitHub HTTP Request Node": { "main": [[{ "node": "Merge", "type": "main", "index": 0 }]] },
+    "Merge": { "main": [[{ "node": "Candidate Intelligence Agent", "type": "main", "index": 0 }]] },
+    "Google Gemini Chat Model3": { "ai_languageModel": [[{ "node": "Candidate Intelligence Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "Structured Output Parser2": { "ai_outputParser": [[{ "node": "Candidate Intelligence Agent", "type": "ai_outputParser", "index": 0 }]] },
+    "Google Gemini Chat Model4": { "ai_languageModel": [[{ "node": "Structured Output Parser1", "type": "ai_languageModel", "index": 0 }]] },
+    "Google Gemini Chat Model5": { "ai_languageModel": [[{ "node": "Structured Output Parser2", "type": "ai_languageModel", "index": 0 }]] },
+    "Candidate Intelligence Agent": { "main": [[{ "node": "Saving to Supabase", "type": "main", "index": 0 }]] },
+    "Saving to Supabase": { "main": [[{ "node": "If Shortlisted", "type": "main", "index": 0 }]] },
+    "If Shortlisted": { "main": [[{ "node": "Check Calendar", "type": "main", "index": 0 }], [{ "node": "Rejection Email Agent", "type": "main", "index": 0 }]] },
+    "Check Calendar": { "main": [[{ "node": "Interview Email Agent", "type": "main", "index": 0 }]] },
+    "Gemini for Interview Email": { "ai_languageModel": [[{ "node": "Interview Email Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "Interview Email Agent": { "main": [[{ "node": "Send Interview Email", "type": "main", "index": 0 }]] },
+    "Gemini for Rejection Email": { "ai_languageModel": [[{ "node": "Rejection Email Agent", "type": "ai_languageModel", "index": 0 }]] },
+    "Rejection Email Agent": { "main": [[{ "node": "Send Rejection Email", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
