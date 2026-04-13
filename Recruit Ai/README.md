@@ -9,7 +9,7 @@
 ## 📸 Screenshots
 
 ### Dashboard — Job Overview
-![Dashboard showing job cards with evaluation stats](docs/screenshots/dashboard.png)
+![Dashboard showing job cards with evaluation stats](./recruit-ai-app/docs/screenshots/dashboard.png)
 
 ### Job Detail — AI Evaluation Results
 ![Job detail page showing shortlisted candidates with AI scores and candidate stories](docs/screenshots/job-detail.png)
