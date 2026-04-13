@@ -74,8 +74,8 @@ I'm constantly learning and improving my PM skills through:
 ## 💡 Let's Connect
 
 If you're interested in discussing product management, AI strategies, or collaboration opportunities:
-- 💼 [LinkedIn](https://www.linkedin.com/in/atik-ali-835285214/) *(Add your link)*
-- 📧 Email: *   atikbndp006@gmail.com*
+- 💼 [LinkedIn](https://www.linkedin.com/in/atik-ali-835285214/) 
+- 📧 Email: atikbndp006@gmail.com
 
 
 ---
