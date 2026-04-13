@@ -12,10 +12,10 @@
 ![Dashboard showing job cards with evaluation stats](./recruit-ai-app/docs/screenshots/dashboard.png)
 
 ### Job Detail — AI Evaluation Results
-![Job detail page showing shortlisted candidates with AI scores and candidate stories](docs/screenshots/job-detail.png)
+![Job detail page showing shortlisted candidates with AI scores and candidate stories](./recruit-ai-app/docs/screenshots/job-detail.png)
 
 ### All Candidates — Cross-Job View
-![All candidates page sorted by AI fit score](docs/screenshots/candidates.png)
+![All candidates page sorted by AI fit score](./recruit-ai-app/docs/screenshots/candidates.png)
 
 ---
 
