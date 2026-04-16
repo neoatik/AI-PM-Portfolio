@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import SmartGoalCard from "@/components/SmartGoalCard";
 
 // --- Types ---
 type Category = {
@@ -358,7 +359,18 @@ export default function SaveSmartApp() {
   // --- RENDERING DASHBOARD ---
   if (!data || !data.goal) return null;
 
-  const PERCENT = Math.round((data.overall.currentSavings / data.overall.targetSavingsGoal) * 100);
+  const PERCENT = Math.round(
+    data.overall.targetSavingsGoal > 0
+      ? (data.overall.currentSavings / data.overall.targetSavingsGoal) * 100
+      : 0
+  );
+
+  // Gap as % of the total savings goal (drives the red CCW arc)
+  const NEG_PERCENT = Math.round(
+    data.overall.targetSavingsGoal > 0
+      ? (data.overall.gap / data.overall.targetSavingsGoal) * 100
+      : 0
+  );
 
   return (
     <div className="min-h-screen bg-[#0C0E14] text-[#E4E4E5] font-sans pb-24 selection:bg-[#EFAF00]/30 selection:text-white">
@@ -541,158 +553,25 @@ export default function SaveSmartApp() {
           </div>
         </header>
 
-        {/* 1. HERO GOAL CARD — D-shape image + right-side arc progress */}
-        <section className="relative bg-[#0F1017] rounded-3xl border border-[#1E2030] shadow-2xl overflow-hidden">
-          <input type="file" id="goal-img" accept="image/*" className="hidden" onChange={handleImageUpload} />
-
-          {/* ── TOP: Image (D-shape) + Arc indicator ── */}
-          <div className="relative h-[240px] md:h-[280px] overflow-hidden">
-
-            {/* Dark void behind the D-shape */}
-            <div className="absolute inset-0 bg-[#090A0F]" />
-
-            {/* D-shaped image: flat left edge, semicircular right edge */}
-            <div
-              className="absolute inset-y-0 left-0 overflow-hidden"
-              style={{ width: '87%', borderRadius: '0 140px 140px 0' }}
-            >
-              {bikeImage ? (
-                <img src={bikeImage} alt="Goal" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-[#111318] flex flex-col items-center justify-center gap-2">
-                  <Camera className="w-9 h-9 text-[#3A3D50]" />
-                  <p className="text-[#3A3D50] text-xs font-medium">Add Goal Photo</p>
-                </div>
-              )}
-              {/* Bottom-fade for text legibility */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent pointer-events-none" />
-            </div>
-
-            {/* Update Photo pill */}
-            <label
-              htmlFor="goal-img"
-              className="absolute top-3 left-3 z-30 bg-black/50 backdrop-blur-sm border border-white/10 hover:bg-black/70 transition-colors cursor-pointer text-white text-[11px] px-3 py-1.5 rounded-full flex items-center gap-1.5"
-            >
-              <Camera className="w-3 h-3" /> Update Photo
-            </label>
-
-            {/* ── ARC PROGRESS ──
-                Center is aligned to the D-curve's center:
-                  horizontal: 87% of parent width
-                  vertical:   50% of image area height
-                The 350×350 SVG is centered there; overflow-hidden on parent clips top/bottom.
-            */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: 'calc(87% - 175px)',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '350px',
-                height: '350px',
-                zIndex: 20,
-              }}
-            >
-              <svg width="350" height="350" viewBox="0 0 350 350">
-                <defs>
-                  {/* Gradient: gold at top → orange → deep red at bottom, matching screenshot */}
-                  <linearGradient
-                    id="goal-arc-grad"
-                    gradientUnits="userSpaceOnUse"
-                    x1="175" y1="305"
-                    x2="175" y2="45"
-                  >
-                    <stop offset="0%"   stopColor="#AA2000" />
-                    <stop offset="30%"  stopColor="#FF4400" />
-                    <stop offset="65%"  stopColor="#FF7700" />
-                    <stop offset="100%" stopColor="#FFAA00" />
-                  </linearGradient>
-                  <filter id="arc-glow-f" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="6" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                  </filter>
-                </defs>
-
-                {/* Background arc track */}
-                <path
-                  d="M 175 305 A 130 130 0 0 1 175 45"
-                  fill="none"
-                  stroke="#1C1E30"
-                  strokeWidth="32"
-                  strokeLinecap="round"
-                />
-
-                {/* Animated progress arc (clockwise from bottom → right → top) */}
-                <motion.path
-                  d="M 175 305 A 130 130 0 0 1 175 45"
-                  fill="none"
-                  stroke="url(#goal-arc-grad)"
-                  strokeWidth="32"
-                  strokeLinecap="round"
-                  strokeDasharray={408}
-                  initial={{ strokeDashoffset: 408 }}
-                  animate={{ strokeDashoffset: 408 - (408 * Math.max(PERCENT, 0) / 100) }}
-                  transition={{ duration: 2.2, ease: 'circOut' }}
-                  filter="url(#arc-glow-f)"
-                />
-              </svg>
-            </div>
-          </div>
-
-          {/* ── MIDDLE: Goal title + amount + thin bar ── */}
-          <div className="px-5 md:px-7 pt-4 pb-4">
-            <p className="text-[#EFAF00] text-sm font-semibold tracking-wide">
-              Goal: {data.goal.name}
-            </p>
-            <div className="flex items-baseline gap-2 mt-1 flex-wrap">
-              <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter leading-none">
-                ₹{data.overall.currentSavings.toLocaleString()}
-              </h2>
-              <span className="text-[#3A3D52] text-base md:text-xl font-medium">
-                / ₹{data.overall.targetSavingsGoal.toLocaleString()}
-              </span>
-            </div>
-
-            {/* Thin progress bar */}
-            <div className="mt-4 h-[6px] rounded-full overflow-hidden bg-[#1B1D2C]">
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: 'linear-gradient(90deg, #AA2000 0%, #FF4400 40%, #FF7700 75%, #FFAA00 100%)' }}
-                initial={{ width: '0%' }}
-                animate={{ width: `${Math.max(PERCENT, 0)}%` }}
-                transition={{ duration: 1.5, ease: 'easeOut' }}
-              />
-            </div>
-          </div>
-
-          {/* ── BOTTOM: Stats row ── */}
-          <div className="flex items-start sm:items-center justify-between px-5 md:px-7 py-4 border-t border-white/[0.04]">
-            <div>
-              <p className="text-[#474A5B] text-[9px] md:text-[10px] uppercase tracking-widest font-extrabold mb-1">Target</p>
-              <p className="text-white text-sm md:text-xl font-bold">₹{data.overall.monthlyTarget.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-[#474A5B] text-[9px] md:text-[10px] uppercase tracking-widest font-extrabold mb-1">On Track</p>
-              <p className="text-white text-sm md:text-xl font-bold">₹{data.overall.remainingForSavings.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-[#474A5B] text-[9px] md:text-[10px] uppercase tracking-widest font-extrabold mb-1">Gap</p>
-              <p className={`text-sm md:text-xl font-bold ${data.overall.gap > 0 ? 'text-[#FF4400]' : 'text-emerald-400'}`}>
-                ₹{data.overall.gap.toLocaleString()}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[#EFAF00] text-2xl md:text-4xl font-black leading-none tracking-tight">
-                {PERCENT}%
-              </p>
-              <p className="text-[#474A5B] text-[9px] md:text-[10px] uppercase tracking-widest font-extrabold mt-1">Completed</p>
-            </div>
-          </div>
-        </section>
-
-
+        {/* 1. HERO GOAL CARD — SmartGoalCard */}
+        <SmartGoalCard
+          goalName={data.goal.name}
+          savedAmount={data.overall.currentSavings}
+          targetAmount={data.overall.targetSavingsGoal}
+          imageUrl={bikeImage}
+          completion={PERCENT}
+          negativePct={NEG_PERCENT}
+          monthlyTarget={data.overall.monthlyTarget}
+          onTrack={data.overall.remainingForSavings}
+          gap={data.overall.gap}
+          onImageChange={(dataUri) => {
+            setBikeImage(dataUri);
+            localStorage.setItem("bike_img", dataUri);
+          }}
+        />
 
         {/* TRADE OFF AI PANEL */}
+
         <AnimatePresence>
           {showScenarios && scenarios.length > 0 && (
              <motion.section initial={{ opacity: 0, scale: 0.95, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full">

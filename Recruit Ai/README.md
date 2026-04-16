@@ -1,10 +1,14 @@
 # 🤖 Recruit AI — AI-Powered Resume Screening Platform
 
 > **Built for:** Recruiters & Hiring Managers who screen 200–500+ resumes per role  
-> **Problem:** Manual resume screening takes 6–8 seconds per resume, leading to inconsistent evaluations, unconscious bias, and delayed candidate communication  
+> **Problem:** Manual resume screening takes 6–8 seconds per resume, leading to inconsistent evaluations, unconscious bias, and delayed candidate communication  (Check out the Problem framing documenst![Problem Framing](./recruit-ai-app/docs/documents/Problem%20Framing%20Document.pdf))
 > **Solution:** An AI-powered platform that automates resume parsing, candidate scoring, and personalized email outreach — reducing screening time from hours to minutes
 
+
 ---
+## 👨‍🔧 Here is how to Use it
+
+![User instruction](./recruit-ai-app/docs/videos/recruit%20ai%20workflow%20wizard.mp4)
 
 ## 📸 Screenshots
 
